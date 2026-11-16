@@ -1,6 +1,6 @@
 # Maintainer: Scott Hiemstra
 pkgname=mytop
-pkgver=0.1.0
+pkgver=0.2.0
 pkgrel=1
 pkgdesc="Terminal system monitor with CPU, memory, GPU (NVIDIA/AMD/Intel), network, disk and sensor graphs"
 arch=('x86_64' 'aarch64')

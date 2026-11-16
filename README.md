@@ -39,19 +39,19 @@ All packages are for x86_64.
 **RHEL / Rocky / Alma / Fedora** (RHEL 8 or newer)
 
 ```sh
-sudo dnf install ./mytop-0.1.0-1.x86_64.rpm
+sudo dnf install ./mytop-0.2.0-1.x86_64.rpm
 ```
 
 **Debian / Ubuntu** (Debian 10+, Ubuntu 20.04+)
 
 ```sh
-sudo apt install ./mytop_0.1.0-1_amd64.deb
+sudo apt install ./mytop_0.2.0-1_amd64.deb
 ```
 
 **Arch Linux**
 
 ```sh
-sudo pacman -U mytop-0.1.0-1-x86_64.pkg.tar.zst
+sudo pacman -U mytop-0.2.0-1-x86_64.pkg.tar.zst
 ```
 
 The release also contains the `PKGBUILD` used to build it, if you prefer to
@@ -61,8 +61,8 @@ build the package yourself with `makepkg -si`.
 tarball contains the binary, man page, README and licence.
 
 ```sh
-tar xf mytop-0.1.0-x86_64-linux-gnu.tar.gz
-sudo install -m755 mytop-0.1.0/mytop /usr/local/bin/
+tar xf mytop-0.2.0-x86_64-linux-gnu.tar.gz
+sudo install -m755 mytop-0.2.0/mytop /usr/local/bin/
 ```
 
 **From source** (Rust 1.85 or newer):

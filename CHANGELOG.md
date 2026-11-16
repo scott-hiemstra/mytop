@@ -4,7 +4,7 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.2.1] - 2026-11-16
 
 ### Fixed
 - Intel GPU % no longer reads near zero when the load comes from another
@@ -46,5 +46,6 @@ First release.
 - Panel toggles (`1`–`7`), adjustable refresh interval, pause.
 - `--bench` flag to time each collector.
 
+[0.2.1]: https://github.com/scott-hiemstra/mytop/releases/tag/v0.2.1
 [0.2.0]: https://github.com/scott-hiemstra/mytop/releases/tag/v0.2.0
 [0.1.0]: https://github.com/scott-hiemstra/mytop/releases/tag/v0.1.0

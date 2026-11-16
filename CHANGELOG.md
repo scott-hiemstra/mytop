@@ -4,6 +4,14 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Fixed
+- Intel GPU % no longer reads near zero when the load comes from another
+  user's processes (e.g. a root-owned inference server). mytop now reads the
+  i915 PMU engine counters when perf events are allowed, and otherwise
+  falls back to the GT awake time.
+
 ## [0.2.0] - 2026-11-16
 
 ### Added

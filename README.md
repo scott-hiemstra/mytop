@@ -144,6 +144,11 @@ mytop runs as a normal user. Some data needs more access:
 - **Intel/AMD per-process GPU usage** is read from `/proc/<pid>/fdinfo`, which
   is only readable for your own processes. Run as root to see everyone's. The
   GPU panel shows "own procs only" when this applies.
+- **Intel GPU %** comes from the i915 PMU (all clients, like `intel_gpu_top`)
+  when perf events are allowed: root, `CAP_PERFMON`
+  (`sudo setcap cap_perfmon+ep $(which mytop)`) or
+  `kernel.perf_event_paranoid <= 0`. Otherwise it is the higher of the
+  fdinfo total and the GT `awake` %, so other users' work still shows up.
 - **Intel VRAM used** from the i915 query needs `CAP_PERFMON` (root). Without
   it, VRAM used is the sum of the visible processes.
 - **Intel VRAM total** needs read/write access to `/dev/dri/renderD*`
@@ -164,8 +169,10 @@ boards) or `it87` (many Gigabyte boards).
 **Intel clock shows 0 MHz.** That's correct: the GPU is idle in RC6 and its
 clock is gated.
 
-**Intel GPU % is 0 but `awake` isn't.** Another user's process (or the
-kernel) is using the GPU and you aren't root, so its fdinfo isn't visible.
+**Intel engine bars are 0 but GPU % isn't.** Another user's process (for
+example a root-owned service or container) is using the GPU and its fdinfo
+isn't visible, so GPU % falls back to the `awake` time. Give mytop
+`CAP_PERFMON` (see Permissions) for exact per-engine numbers.
 
 **Characters look wrong.** Use a UTF-8 locale and a font with braille and
 block-element glyphs (most modern terminal fonts have them).

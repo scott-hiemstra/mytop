@@ -4,7 +4,9 @@ use super::{GpuSample, fdinfo::DevUsage};
 use crate::util::*;
 use std::{
     fs::{self, File},
-    os::fd::AsRawFd,
+    collections::BTreeMap,
+    io::Read,
+    os::fd::{AsRawFd, FromRawFd},
     path::{Path, PathBuf},
     time::Instant,
 };
@@ -17,6 +19,8 @@ pub struct IntelGpu {
     render: Option<File>,
     prev_energy: Option<(u64, Instant)>,
     prev_idle: Option<(f64, Instant)>,
+    pmu: Option<Pmu>,
+    is_root: bool,
 }
 
 fn glob2(base: &Path, a: &str, b: &str, tail: &str) -> Vec<PathBuf> {
@@ -83,6 +87,7 @@ impl IntelGpu {
                     .open(Path::new("/dev/dri").join(e.file_name()))
                     .ok()
             });
+        let pmu = if xe { None } else { Pmu::open(dev) };
         Self {
             xe,
             hwmon,
@@ -91,6 +96,8 @@ impl IntelGpu {
             render,
             prev_energy: None,
             prev_idle: None,
+            pmu,
+            is_root: unsafe { libc::geteuid() } == 0,
         }
     }
 
@@ -109,6 +116,13 @@ impl IntelGpu {
             s.util = Some(0.0);
         }
 
+        // Device-wide engine busy from the i915 PMU covers every client,
+        // including other users' processes that fdinfo cannot see.
+        if let Some(engines) = self.pmu.as_mut().and_then(|p| p.sample(now)) {
+            s.util = Some(engines.values().copied().fold(0.0, f64::max));
+            s.engines = engines.into_iter().collect();
+        }
+
         // "Awake" = time not in RC6 / gt-idle — device-wide, works without root
         if !self.idle_files.is_empty() {
             let idle: f64 = self
@@ -122,6 +136,13 @@ impl IntelGpu {
                 if ms > 0.0 {
                     let awake = (100.0 - (idle - pi) / ms * 100.0).clamp(0.0, 100.0);
                     s.extra.push(("awake".into(), format!("{awake:.0}%")));
+                    // Without root (and without the PMU) fdinfo only sees our
+                    // own processes; the GT can't be busier than it is awake,
+                    // and it drops into RC6 within ms of going idle, so awake
+                    // is the best device-wide estimate left.
+                    if self.pmu.is_none() && !self.is_root {
+                        s.util = Some(s.util.unwrap_or(0.0).max(awake));
+                    }
                 }
             }
             self.prev_idle = Some((idle, now));
@@ -160,6 +181,92 @@ impl IntelGpu {
             }
         }
         s
+    }
+}
+
+/// i915 PMU engine busy counters (what `intel_gpu_top` reads). System-wide
+/// perf events need CAP_PERFMON / root or `kernel.perf_event_paranoid <= 0`.
+struct Pmu {
+    /// (engine class name, counter file)
+    counters: Vec<(String, File)>,
+    prev: Option<(Vec<u64>, Instant)>,
+}
+
+impl Pmu {
+    fn open(dev: &Path) -> Option<Self> {
+        let pci = fs::canonicalize(dev).ok()?.file_name()?.to_str()?.to_string();
+        let base = Path::new("/sys/bus/event_source/devices");
+        let dir = [format!("i915_{}", pci.replace(':', "_")), "i915".into()]
+            .into_iter()
+            .map(|n| base.join(n))
+            .find(|d| d.exists())?;
+        let ty: u32 = read_num(dir.join("type"))?;
+        let cpu: i32 = read_str(dir.join("cpumask"))
+            .and_then(|s| s.split([',', '-']).next()?.trim().parse().ok())
+            .unwrap_or(0);
+        let mut events: Vec<(String, u64)> = fs::read_dir(dir.join("events"))
+            .ok()?
+            .flatten()
+            .filter_map(|e| {
+                let name = e.file_name().to_str()?.strip_suffix("-busy")?.to_string();
+                let cfg = read_str(e.path())?;
+                let cfg = u64::from_str_radix(cfg.trim().strip_prefix("config=0x")?, 16).ok()?;
+                Some((name, cfg))
+            })
+            .collect();
+        events.sort();
+        let mut counters = vec![];
+        for (name, cfg) in events {
+            // struct perf_event_attr: type@0 (u32), size@4 (u32), config@8 (u64)
+            let mut attr = [0u64; 17];
+            attr[0] = ty as u64 | ((size_of_val(&attr) as u64) << 32);
+            attr[1] = cfg;
+            let fd = unsafe {
+                libc::syscall(libc::SYS_perf_event_open, attr.as_ptr(), -1, cpu, -1, 0)
+            };
+            if fd < 0 {
+                return None; // permission denied: all or nothing
+            }
+            let class = name.trim_end_matches(|c: char| c.is_ascii_digit());
+            let class = match class {
+                "rcs" => "render",
+                "bcs" => "copy",
+                "vcs" => "video",
+                "vecs" => "video-enhance",
+                "ccs" => "compute",
+                o => o,
+            };
+            counters.push((class.to_string(), unsafe { File::from_raw_fd(fd as i32) }));
+        }
+        (!counters.is_empty()).then_some(Self {
+            counters,
+            prev: None,
+        })
+    }
+
+    /// Engine class -> busy %, averaged over instances (like fdinfo capacity).
+    fn sample(&mut self, now: Instant) -> Option<BTreeMap<String, f64>> {
+        let vals: Vec<u64> = self
+            .counters
+            .iter_mut()
+            .map(|(_, f)| {
+                let mut b = [0u8; 8];
+                f.read_exact(&mut b).map(|_| u64::from_ne_bytes(b)).unwrap_or(0)
+            })
+            .collect();
+        let prev = self.prev.replace((vals.clone(), now))?;
+        let dt = now.duration_since(prev.1).as_nanos() as f64;
+        if dt <= 0.0 {
+            return None;
+        }
+        let mut sum: BTreeMap<String, (f64, u32)> = BTreeMap::new();
+        for (i, (class, _)) in self.counters.iter().enumerate() {
+            let pct = (vals[i].saturating_sub(prev.0[i]) as f64 / dt * 100.0).min(100.0);
+            let e = sum.entry(class.clone()).or_default();
+            e.0 += pct;
+            e.1 += 1;
+        }
+        Some(sum.into_iter().map(|(k, (s, n))| (k, s / n as f64)).collect())
     }
 }
 

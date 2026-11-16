@@ -79,6 +79,7 @@ automatically when the proprietary driver's `libnvidia-ml.so.1` is present.
 ```
 mytop                 # 1 s refresh
 mytop -i 500          # 500 ms refresh
+mytop --reset         # start from the default view
 mytop --bench         # time each collector and exit
 sudo mytop            # also see other users' GPU processes (Intel/AMD)
 man mytop
@@ -96,6 +97,12 @@ man mytop
 | `+` / `-` | refresh interval ±250 ms |
 | `space` | pause / resume |
 | `1`–`7` | show/hide the cpu, mem, gpu, net, disk, sensors, procs panels |
+| `D` | reset the view to the defaults |
+
+mytop remembers the view between runs: the refresh interval, sort column and
+order, and which panels are shown are saved to `~/.config/mytop/mytop.conf`
+(or `$XDG_CONFIG_HOME/mytop/mytop.conf`) whenever they change. `-i` and
+`--reset` are remembered too. Pause and the selected process are not.
 
 ## Reading the panels
 

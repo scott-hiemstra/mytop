@@ -4,6 +4,7 @@ mytop \- terminal system monitor with CPU, memory, GPU, network, disk and sensor
 .SH SYNOPSIS
 .B mytop
 [\fB\-i\fR \fIMS\fR]
+[\fB\-\-reset\fR]
 [\fB\-\-bench\fR]
 [\fB\-h\fR]
 .SH DESCRIPTION
@@ -29,7 +30,11 @@ i915 query ioctl and DRM fdinfo.
 .SH OPTIONS
 .TP
 .BR \-i ", " \-\-interval " " \fIMS\fR
-Refresh interval in milliseconds (100\(en10000, default 1000).
+Refresh interval in milliseconds (100\(en10000, default 1000). It is
+remembered for later runs.
+.TP
+.B \-\-reset
+Start from the default view instead of the remembered one.
 .TP
 .B \-\-bench
 Run ten refreshes without a user interface, print the average time each
@@ -68,6 +73,9 @@ Pause or resume updates.
 .TP
 .BR 1 \(en 7
 Show or hide the cpu, mem, gpu, net, disk, sensors and procs panels.
+.TP
+.B D
+Reset the view (refresh interval, sort, shown panels) to the defaults.
 .SH PERMISSIONS
 mytop runs as an ordinary user. A few readings need more privileges:
 .IP \(bu 2
@@ -82,6 +90,12 @@ otherwise VRAM used is the sum of the processes that are visible.
 Opening the Intel render node (\fI/dev/dri/renderD*\fR) requires membership
 of the \fBrender\fR group, which desktop users normally have.
 .SH FILES
+.TP
+.I ~/.config/mytop/mytop.conf
+The remembered view: refresh interval, sort column and order, and hidden
+panels, saved whenever they change. \fI$XDG_CONFIG_HOME/mytop/mytop.conf\fR
+when \fBXDG_CONFIG_HOME\fR is set. Delete it, press \fBD\fR or run
+\fBmytop \-\-reset\fR to go back to the defaults.
 .TP
 .I /proc/stat, /proc/meminfo, /proc/net/dev, /proc/diskstats
 CPU, memory, network and disk counters.

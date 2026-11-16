@@ -4,6 +4,17 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- The view is remembered between runs: refresh interval, sort column and
+  order, and shown panels are saved to `~/.config/mytop/mytop.conf`
+  (`$XDG_CONFIG_HOME` is honoured) whenever they change.
+- `D` resets the view to the defaults; `--reset` starts from them.
+
+### Changed
+- `-i` without a number is now an error instead of being ignored.
+
 ## [0.1.0] - 2026-11-16
 
 First release.

@@ -788,6 +788,7 @@ fn draw_footer(f: &mut Frame, area: Rect, app: &App) {
         spans.extend(key("k/K", "term/kill"));
         spans.extend(key("+/-", &format!("{}ms", app.interval.as_millis())));
         spans.extend(key("space", if app.paused { "resume" } else { "pause" }));
+        spans.extend(key("D", "defaults"));
         spans.push(dim(" │"));
         for (i, p) in PANELS.iter().enumerate() {
             // hidden panels are dimmed out

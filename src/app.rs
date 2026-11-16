@@ -1,8 +1,11 @@
-use crate::{cpu::Cpu, disk::Disk, gpu::Gpus, mem::Mem, net::Net, procs::Procs, sensors::Sensors};
+use crate::{
+    config::Settings, cpu::Cpu, disk::Disk, gpu::Gpus, mem::Mem, net::Net, procs::Procs,
+    sensors::Sensors,
+};
 use ratatui::widgets::TableState;
 use std::time::{Duration, Instant};
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum SortKey {
     Cpu,
     Mem,
@@ -29,6 +32,11 @@ impl SortKey {
             Self::Pid => "pid",
             Self::Name => "name",
         }
+    }
+    pub fn from_label(s: &str) -> Option<Self> {
+        [Self::Cpu, Self::Mem, Self::Gpu, Self::Pid, Self::Name]
+            .into_iter()
+            .find(|k| k.label() == s)
     }
 }
 
@@ -57,7 +65,7 @@ pub struct App {
 }
 
 impl App {
-    pub fn new(interval: Duration) -> Self {
+    pub fn new(settings: Settings) -> Self {
         let mut app = Self {
             cpu: Cpu::new(),
             mem: Mem::new(),
@@ -66,13 +74,13 @@ impl App {
             sensors: Sensors::new(),
             gpus: Gpus::new(),
             procs: Procs::new(),
-            interval,
+            interval: settings.interval,
             last_update: Instant::now(),
-            sort: SortKey::Cpu,
-            reverse: false,
+            sort: settings.sort,
+            reverse: settings.reverse,
             table: TableState::default().with_selected(0),
             selected_pid: None,
-            show: [true; 7],
+            show: settings.show,
             paused: false,
             is_root: unsafe { libc::geteuid() } == 0,
             pending_kill: None,
@@ -83,6 +91,26 @@ impl App {
         std::thread::sleep(Duration::from_millis(250));
         app.update();
         app
+    }
+
+    /// The view settings that are remembered between runs.
+    pub fn settings(&self) -> Settings {
+        Settings {
+            interval: self.interval,
+            sort: self.sort,
+            reverse: self.reverse,
+            show: self.show,
+        }
+    }
+
+    pub fn apply(&mut self, s: Settings) {
+        self.interval = s.interval;
+        self.sort = s.sort;
+        self.reverse = s.reverse;
+        self.show = s.show;
+        self.selected_pid = None;
+        self.table.select(Some(0));
+        self.sort_procs();
     }
 
     pub fn update(&mut self) {

@@ -3,8 +3,8 @@
 use super::{GpuSample, fdinfo::DevUsage};
 use crate::util::*;
 use std::{
-    fs::{self, File},
     collections::BTreeMap,
+    fs::{self, File},
     io::Read,
     os::fd::{AsRawFd, FromRawFd},
     path::{Path, PathBuf},
@@ -194,7 +194,11 @@ struct Pmu {
 
 impl Pmu {
     fn open(dev: &Path) -> Option<Self> {
-        let pci = fs::canonicalize(dev).ok()?.file_name()?.to_str()?.to_string();
+        let pci = fs::canonicalize(dev)
+            .ok()?
+            .file_name()?
+            .to_str()?
+            .to_string();
         let base = Path::new("/sys/bus/event_source/devices");
         let dir = [format!("i915_{}", pci.replace(':', "_")), "i915".into()]
             .into_iter()
@@ -221,9 +225,8 @@ impl Pmu {
             let mut attr = [0u64; 17];
             attr[0] = ty as u64 | ((size_of_val(&attr) as u64) << 32);
             attr[1] = cfg;
-            let fd = unsafe {
-                libc::syscall(libc::SYS_perf_event_open, attr.as_ptr(), -1, cpu, -1, 0)
-            };
+            let fd =
+                unsafe { libc::syscall(libc::SYS_perf_event_open, attr.as_ptr(), -1, cpu, -1, 0) };
             if fd < 0 {
                 return None; // permission denied: all or nothing
             }
@@ -251,7 +254,9 @@ impl Pmu {
             .iter_mut()
             .map(|(_, f)| {
                 let mut b = [0u8; 8];
-                f.read_exact(&mut b).map(|_| u64::from_ne_bytes(b)).unwrap_or(0)
+                f.read_exact(&mut b)
+                    .map(|_| u64::from_ne_bytes(b))
+                    .unwrap_or(0)
             })
             .collect();
         let prev = self.prev.replace((vals.clone(), now))?;
@@ -266,7 +271,11 @@ impl Pmu {
             e.0 += pct;
             e.1 += 1;
         }
-        Some(sum.into_iter().map(|(k, (s, n))| (k, s / n as f64)).collect())
+        Some(
+            sum.into_iter()
+                .map(|(k, (s, n))| (k, s / n as f64))
+                .collect(),
+        )
     }
 }
 

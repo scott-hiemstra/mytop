@@ -482,7 +482,7 @@ fn draw_gpu_top(f: &mut Frame, area: Rect, g: &Gpu, is_root: bool) {
             } else {
                 String::new()
             };
-            Line::from(vec![
+            let mut l = vec![
                 dim(" ▸ "),
                 Span::styled(
                     format!("{:<name_w$.name_w$}", p.name),
@@ -490,8 +490,13 @@ fn draw_gpu_top(f: &mut Frame, area: Rect, g: &Gpu, is_root: bool) {
                 ),
                 col(format!("{:>4.0}%", p.util), grad(p.util)),
                 col(format!("{vram:>7}"), C_VRAM),
-                dim(format!("  pid {}", p.pid)),
-            ])
+            ];
+            // only show the pid when it fits completely
+            let pid = format!("  pid {}", p.pid);
+            if 3 + name_w + 12 + pid.len() <= area.width as usize {
+                l.push(dim(pid));
+            }
+            Line::from(l)
         })
         .collect();
     if lines.is_empty() {

@@ -121,7 +121,7 @@ impl App {
         let l = &mut self.procs.list;
         match self.sort {
             SortKey::Cpu => l.sort_by(|a, b| b.cpu.total_cmp(&a.cpu).then(b.rss.cmp(&a.rss))),
-            SortKey::Mem => l.sort_by(|a, b| b.rss.cmp(&a.rss)),
+            SortKey::Mem => l.sort_by_key(|p| std::cmp::Reverse(p.rss)),
             SortKey::Gpu => l.sort_by(|a, b| {
                 b.gpu
                     .unwrap_or(-1.0)

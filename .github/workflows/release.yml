@@ -1,0 +1,62 @@
+name: release
+
+# Push a tag like v0.2.0 (matching Cargo.toml's version) to build and publish
+# a GitHub release with RHEL (.rpm), Debian/Ubuntu (.deb), Arch (.pkg.tar.zst)
+# and generic (.tar.gz) packages.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Check tag matches Cargo.toml version
+        run: |
+          ver=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)
+          if [ "v$ver" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::tag $GITHUB_REF_NAME does not match Cargo.toml version $ver"
+            exit 1
+          fi
+          echo "VERSION=$ver" >> "$GITHUB_ENV"
+
+      - name: Build binary, .deb, .rpm and .tar.gz (Rocky Linux 8, glibc 2.28)
+        run: docker run --rm -v "$PWD":/src -w /src rockylinux/rockylinux:8 bash packaging/build-glibc.sh
+
+      - name: Download GitHub source archive for the PKGBUILD
+        run: curl -fsSL -o "mytop-$VERSION.tar.gz" "https://github.com/$GITHUB_REPOSITORY/archive/refs/tags/$GITHUB_REF_NAME.tar.gz"
+
+      - name: Build Arch Linux package
+        run: docker run --rm -v "$PWD":/src -w /src archlinux:latest bash packaging/arch/build.sh
+
+      - name: Checksums
+        run: |
+          cd dist
+          sha256sum -- * > SHA256SUMS
+          cat SHA256SUMS
+
+      - name: Release notes from CHANGELOG.md
+        run: |
+          awk -v v="$VERSION" '$0 ~ "^## \\[" v "\\]" {f=1; next} /^## \[/ {f=0} f' CHANGELOG.md > notes.md
+          cat >> notes.md <<'EOF'
+
+          ### Install
+
+          | Distribution | Command |
+          |---|---|
+          | RHEL / Rocky / Alma / Fedora (8+) | `sudo dnf install ./mytop-*.x86_64.rpm` |
+          | Debian 10+ / Ubuntu 20.04+ | `sudo apt install ./mytop_*_amd64.deb` |
+          | Arch Linux | `sudo pacman -U mytop-*-x86_64.pkg.tar.zst` |
+          | Other (glibc 2.28+) | extract the `.tar.gz` and copy `mytop` to your `PATH` |
+          EOF
+          cat notes.md
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" dist/* --title "mytop $VERSION" --notes-file notes.md --verify-tag

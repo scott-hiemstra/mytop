@@ -2,9 +2,60 @@
 name = "mytop"
 version = "0.1.0"
 edition = "2024"
+rust-version = "1.85"
+authors = ["Scott Hiemstra"]
+description = "Terminal system monitor with graphs for CPU, memory, GPU (NVIDIA, AMD, Intel), network, disk I/O and hardware sensors"
+license = "MIT"
+repository = "https://github.com/scott-hiemstra/mytop"
+readme = "README.md"
+keywords = ["top", "monitor", "gpu", "tui", "system"]
+categories = ["command-line-utilities"]
 
 [dependencies]
 anyhow = "1.0.104"
 libc = "0.2.191"
 nvml-wrapper = "0.13.0"
 ratatui = "0.30"
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true
+
+# ── Debian / Ubuntu package (cargo-deb) ─────────────────────────────────────
+[package.metadata.deb]
+maintainer = "Scott Hiemstra"
+copyright = "2026, Scott Hiemstra"
+license-file = ["LICENSE", "0"]
+section = "admin"
+priority = "optional"
+# Built on glibc 2.28 (Rocky Linux 8) so it runs on Debian 10+ / Ubuntu 20.04+.
+depends = "libc6 (>= 2.28), libgcc-s1 | libgcc1"
+extended-description = """\
+mytop is a top-style terminal monitor showing CPU, memory, GPU, network, \
+disk I/O and hardware sensors with braille history graphs, plus a sortable \
+process table with per-process GPU usage. NVIDIA GPUs are read through NVML \
+(proprietary driver), AMD and Intel GPUs through sysfs and DRM fdinfo."""
+assets = [
+    ["target/release/mytop", "usr/bin/", "755"],
+    ["docs/mytop.1", "usr/share/man/man1/mytop.1", "644"],
+    ["README.md", "usr/share/doc/mytop/README.md", "644"],
+    ["CHANGELOG.md", "usr/share/doc/mytop/CHANGELOG.md", "644"],
+]
+
+# ── RHEL / Fedora / Rocky / Alma package (cargo-generate-rpm) ──────────────
+[package.metadata.generate-rpm]
+summary = "Terminal system monitor with CPU, memory, GPU, network, disk and sensor graphs"
+release = "1"
+auto-req = "no"
+assets = [
+    { source = "target/release/mytop", dest = "/usr/bin/mytop", mode = "755" },
+    { source = "docs/mytop.1", dest = "/usr/share/man/man1/mytop.1", mode = "644", doc = true },
+    { source = "README.md", dest = "/usr/share/doc/mytop/README.md", mode = "644", doc = true },
+    { source = "CHANGELOG.md", dest = "/usr/share/doc/mytop/CHANGELOG.md", mode = "644", doc = true },
+    { source = "LICENSE", dest = "/usr/share/licenses/mytop/LICENSE", mode = "644", doc = true },
+]
+
+[package.metadata.generate-rpm.requires]
+glibc = ">= 2.28"
+libgcc = "*"

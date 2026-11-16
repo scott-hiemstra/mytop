@@ -1,0 +1,115 @@
+.TH MYTOP 1 "November 2026" "mytop 0.1.0" "User Commands"
+.SH NAME
+mytop \- terminal system monitor with CPU, memory, GPU, network, disk and sensor graphs
+.SH SYNOPSIS
+.B mytop
+[\fB\-i\fR \fIMS\fR]
+[\fB\-\-bench\fR]
+[\fB\-h\fR]
+.SH DESCRIPTION
+.B mytop
+is an interactive, top\-style monitor for Linux. It shows braille history
+graphs and live statistics for the CPU, memory, every GPU, network
+interfaces, disks and hardware sensors, plus a sortable process table that
+includes per\-process GPU utilisation and video memory.
+.PP
+GPUs from three vendors are supported:
+.TP
+.B NVIDIA
+through NVML (\fIlibnvidia\-ml.so.1\fR, shipped with the proprietary
+driver). The library is loaded at run time; without it mytop still runs and
+simply shows no NVIDIA data.
+.TP
+.B Intel
+(i915 and xe drivers) through sysfs, hwmon, RC6/gt\-idle residency, the
+i915 query ioctl and DRM fdinfo.
+.TP
+.B AMD
+(amdgpu driver) through sysfs, hwmon and DRM fdinfo.
+.SH OPTIONS
+.TP
+.BR \-i ", " \-\-interval " " \fIMS\fR
+Refresh interval in milliseconds (100\(en10000, default 1000).
+.TP
+.B \-\-bench
+Run ten refreshes without a user interface, print the average time each
+collector took and exit.
+.TP
+.BR \-h ", " \-\-help
+Print a short usage message and exit.
+.SH KEYS
+.TP
+.BR q ", " Esc ", " Ctrl\-C
+Quit.
+.TP
+.B s
+Cycle the process sort column (cpu, mem, gpu, pid, name).
+.TP
+.B r
+Reverse the sort order.
+.TP
+.BR c ", " m ", " g ", " p ", " n
+Sort processes by CPU, memory, GPU, PID or name.
+.TP
+.BR Up ", " Down ", " PgUp ", " PgDn ", " Home ", " End
+Move the process selection.
+.TP
+.B k
+Send SIGTERM to the selected process (asks for confirmation).
+.TP
+.B K
+Send SIGKILL to the selected process (asks for confirmation).
+.TP
+.BR + ", " \-
+Increase or decrease the refresh interval by 250 ms.
+.TP
+.B Space
+Pause or resume updates.
+.TP
+.BR 1 \(en 7
+Show or hide the cpu, mem, gpu, net, disk, sensors and procs panels.
+.SH PERMISSIONS
+mytop runs as an ordinary user. A few readings need more privileges:
+.IP \(bu 2
+Per\-process GPU usage for Intel and AMD comes from
+\fI/proc/<pid>/fdinfo\fR, which a normal user can read only for their own
+processes. Run mytop as root to see every process. The GPU panel shows
+\(lqown procs only\(rq when this applies.
+.IP \(bu 2
+Intel VRAM \(lqused\(rq from the i915 query ioctl requires CAP_PERFMON (root);
+otherwise VRAM used is the sum of the processes that are visible.
+.IP \(bu 2
+Opening the Intel render node (\fI/dev/dri/renderD*\fR) requires membership
+of the \fBrender\fR group, which desktop users normally have.
+.SH FILES
+.TP
+.I /proc/stat, /proc/meminfo, /proc/net/dev, /proc/diskstats
+CPU, memory, network and disk counters.
+.TP
+.I /proc/<pid>/stat, /proc/<pid>/cmdline, /proc/<pid>/fdinfo/*
+Process statistics and DRM client usage.
+.TP
+.I /sys/class/hwmon/*
+Temperature and fan sensors.
+.TP
+.I /sys/class/drm/card*
+GPU discovery and AMD/Intel statistics.
+.TP
+.I /sys/firmware/memmap
+Installed RAM.
+.SH NOTES
+Motherboard temperatures and fan speeds appear only when a Super\-I/O
+sensor driver such as \fBnct6775\fR or \fBit87\fR is loaded; see
+.BR sensors\-detect (8).
+.SH SEE ALSO
+.BR top (1),
+.BR htop (1),
+.BR btop (1),
+.BR nvtop (1),
+.BR nvidia\-smi (1),
+.BR intel_gpu_top (1),
+.BR sensors (1)
+.SH BUGS
+Report bugs at https://github.com/scott\-hiemstra/mytop/issues
+.SH LICENSE
+MIT

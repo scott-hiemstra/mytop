@@ -65,6 +65,32 @@ pub struct Gpu {
     pub s: GpuSample,
     pub util_hist: History,
     pub mem_hist: History,
+    /// Heaviest processes on this GPU (by util, then VRAM), at most 2.
+    pub top: Vec<TopProc>,
+}
+
+pub struct TopProc {
+    pub pid: u32,
+    pub name: String,
+    pub util: f64,
+    pub vram: u64,
+}
+
+fn top_procs(procs: &HashMap<u32, ProcGpu>, n: usize) -> Vec<TopProc> {
+    let mut v: Vec<(&u32, &ProcGpu)> = procs
+        .iter()
+        .filter(|(_, p)| p.util > 0.5 || p.vram > 0)
+        .collect();
+    v.sort_by(|a, b| b.1.util.total_cmp(&a.1.util).then(b.1.vram.cmp(&a.1.vram)));
+    v.into_iter()
+        .take(n)
+        .map(|(pid, p)| TopProc {
+            pid: *pid,
+            name: read_str(format!("/proc/{pid}/comm")).unwrap_or_else(|| "?".into()),
+            util: p.util,
+            vram: p.vram,
+        })
+        .collect()
 }
 
 pub struct Gpus {
@@ -185,6 +211,7 @@ impl Gpus {
                 s: GpuSample::default(),
                 util_hist: History::new(1000),
                 mem_hist: History::new(1000),
+                top: vec![],
             });
         }
 
@@ -224,6 +251,7 @@ impl Gpus {
                     s: GpuSample::default(),
                     util_hist: History::new(1000),
                     mem_hist: History::new(1000),
+                    top: vec![],
                 });
             }
         }
@@ -250,23 +278,28 @@ impl Gpus {
 
         for g in &mut self.list {
             let du = usage.get(&g.pci);
+            let mut nv_procs = HashMap::new();
             g.s = match &mut g.backend {
                 Backend::Nvidia(i) => match &self.nvml {
                     Some(n) => {
-                        nvidia::sample(n, *i, self.nv_ts.entry(*i).or_default(), &mut self.procs)
+                        nvidia::sample(n, *i, self.nv_ts.entry(*i).or_default(), &mut nv_procs)
                     }
                     None => GpuSample::default(),
                 },
                 Backend::Amd(a) => a.sample(du),
                 Backend::Intel(x) => x.sample(du),
             };
-            if let (Some(du), false) = (du, g.vendor == Vendor::Nvidia) {
-                for (pid, pg) in &du.procs {
-                    let e = self.procs.entry(*pid).or_default();
-                    e.util = (e.util + pg.util).min(100.0);
-                    e.vram += pg.vram;
-                }
+            let gpu_procs = match (g.vendor, du) {
+                (Vendor::Nvidia, _) => &nv_procs,
+                (_, Some(du)) => &du.procs,
+                _ => &nv_procs, // empty
+            };
+            for (pid, pg) in gpu_procs {
+                let e = self.procs.entry(*pid).or_default();
+                e.util = (e.util + pg.util).min(100.0);
+                e.vram += pg.vram;
             }
+            g.top = top_procs(gpu_procs, 2);
             g.util_hist.push(g.s.util.unwrap_or(0.0));
             let mem_pct = match (g.s.mem_used, g.s.mem_total) {
                 (Some(u), Some(t)) if t > 0 => u as f64 / t as f64 * 100.0,

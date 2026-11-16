@@ -364,6 +364,10 @@ fn draw_gpu(f: &mut Frame, area: Rect, idx: usize, g: &Gpu, is_root: bool) {
     let stats_w = (inner.width / 2).clamp(24, 40);
     let [ch, stats] =
         Layout::horizontal([Constraint::Fill(1), Constraint::Length(stats_w)]).areas(inner);
+    let top_h = if ch.height >= 6 { 2 } else { 0 };
+    let [ch, top_area] =
+        Layout::vertical([Constraint::Fill(1), Constraint::Length(top_h)]).areas(ch);
+    draw_gpu_top(f, top_area, g, is_root);
     chart(
         f,
         ch,
@@ -461,6 +465,44 @@ fn draw_gpu(f: &mut Frame, area: Rect, idx: usize, g: &Gpu, is_root: bool) {
         lines.push(Line::from(l));
     }
     f.render_widget(Paragraph::new(lines), stats);
+}
+
+fn draw_gpu_top(f: &mut Frame, area: Rect, g: &Gpu, is_root: bool) {
+    if area.height == 0 {
+        return;
+    }
+    // name, gpu%, vram, then pid last so narrow panels only lose the pid
+    let name_w = (area.width as usize).saturating_sub(3 + 5 + 7).clamp(6, 16);
+    let mut lines: Vec<Line> = g
+        .top
+        .iter()
+        .map(|p| {
+            let vram = if p.vram > 0 {
+                fmt_bytes(p.vram as f64)
+            } else {
+                String::new()
+            };
+            Line::from(vec![
+                dim(" ▸ "),
+                Span::styled(
+                    format!("{:<name_w$.name_w$}", p.name),
+                    Style::new().add_modifier(Modifier::BOLD),
+                ),
+                col(format!("{:>4.0}%", p.util), grad(p.util)),
+                col(format!("{vram:>7}"), C_VRAM),
+                dim(format!("  pid {}", p.pid)),
+            ])
+        })
+        .collect();
+    if lines.is_empty() {
+        let msg = if g.vendor != Vendor::Nvidia && !is_root {
+            " no visible GPU processes (run as root to see all)"
+        } else {
+            " no GPU processes"
+        };
+        lines.push(Line::from(dim(msg)));
+    }
+    f.render_widget(Paragraph::new(lines), area);
 }
 
 fn io_panel(
